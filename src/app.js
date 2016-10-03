@@ -1,50 +1,68 @@
 "use strict";
 
+const debug = false;
+
 /* Classes */
 const Game = require('./game');
 
 /* Global variables */
 var canvas = document.getElementById('screen');
 var game = new Game(canvas, update, render);
+var player = 0;
+var scores = [0,0];
 var image = new Image();
 image.src = 'assets/animals.png';
+var blip = new Audio();
+blip.src = 'blip.wav';
+var flip = new Audio();
+flip.src = 'flip.wav';
+var pair = new Audio();
+pair.src = 'pair.wav';
+var state = "waiting for first click";
+var card1, card2;
+var timer = 0;
 
 // We have 9 pairs of possible cards that are about 212px square
 var cards = [0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8];
 var board = [];
 while(cards.length > 0) {
   var index = Math.floor(Math.random() * (cards.length - 1));
-  board.push({card: cards[index], flip: true});
+  board.push({card: cards[index], flip: false});
   cards.splice(index, 1);
 }
-var state ="waiting for click 1";
-var player = 0;
-var scores = [0,0];
-var card1, card2;
-console.log(board);
 
 // TODO: Place the cards on the board in random order
 
 canvas.onclick = function(event) {
   event.preventDefault();
-  var x = Math.floor((event.clientX-3)/165);
-  var y = Math.floor((event.clientY-3)/165);
-  var card = board[y*6 + x];
-  if(!card || card.flip) return;
-  car.flip = true;
-  switch(state){
-    case "waiting for click 1":
-      card1 = card;
-      state = "waiting for click 2";
+  switch(state) {
+    case "waiting for first click":
+      if(!board[currentIndex] || board[currentIndex].flip ) return blip.play();
+      card1 = board[currentIndex];
+      card1.flip = true;
+      flip.play();
+      state = "waiting for second click";
       break;
-    case "waiting for click 2":
-      card2 = card;
-      state = "waiting for time";
-
+    case "waiting for second click":
+      if(!board[currentIndex] || board[currentIndex].flip ) return blip.play();
+      card2 = board[currentIndex];
+      card2.flip = true;
+      flip.play();
+      state = "waiting ...";
+      timer = 0;
       break;
   }
-  // TODO: determine which card was clicked on
-  // TODO: determine what to do
+}
+
+
+var currentIndex, currentX, currentY;
+canvas.onmousemove = function(event) {
+  event.preventDefault();
+  currentX = event.offsetX;
+  currentY = event.offsetY;
+  var x = Math.floor((currentX + 3) / 165);
+  var y = Math.floor((currentY + 3) / 165);
+  currentIndex = y * 6 + x;
 }
 
 /**
@@ -68,7 +86,20 @@ masterLoop(performance.now());
  * the number of milliseconds passed since the last frame.
  */
 function update(elapsedTime) {
-  if(state = "waiting for time")
+  if(state == "waiting ...") {
+    timer += elapsedTime;
+    if(timer > 2000) {
+      if(card1.card == card2.card) {
+        pair.play();
+      } else {
+        blip.play();
+        card1.flip = false;
+        card2.flip = false;
+        player = (player == 0) ? 1 : 0;
+      }
+      state = "waiting for first click";
+    }
+  }
 }
 
 /**
@@ -90,16 +121,30 @@ function render(elapsedTime, ctx) {
         // render cute animal
         ctx.drawImage(image,
           // Source rect
-          card.card % 3 * 212, Math.floor(card.card / 3) * 212, 212, 212,
+          card.card % 3 * 212 + 2, Math.floor(card.card / 3) * 212 + 2, 212, 212,
           // Dest rect
           x * 165 + 3, y * 165 + 3, 160, 160
         );
       } else {
         // draw the back of the card (212x212px)
         ctx.fillStyle = "#3333ff";
-        ctx.fillRect(x * 165 + 3, y * 165 + 3, 160, 160);
+        ctx.fillRect(x * 165 + 3, y * 165 + 4, 160, 160);
       }
     }
   }
+
+  if(debug) {
+    var x = currentIndex % 6;
+    var y = Math.floor(currentIndex / 6);
+    ctx.strokeStyle = "#ff0000";
+    ctx.beginPath();
+    ctx.arc(currentX, currentY, 3, 0, 2*Math.PI);
+    ctx.rect(x * 165 + 3, y * 165 + 3, 163, 163);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "black";
+  ctx.font = "48px serif";
+  ctx.strokeText("Player " + (player + 1) + "'s Turn", 350, 550);
 
 }
